@@ -35,4 +35,4 @@ git clone git@github.com:alexanderkoumis/cmpe142fs.git
 
 This will copy the project's contents into ~/git/cmpe142fs. Each contributor will maintain their own local working branch, which should always be based on the latest code from the master. Enter the following to create your own branch, and push it to the GitHub repository, making it accessible from the 'branches' button:
 
-[Imgur](http://i.imgur.com/27enzJB.png)
+![Branches](http://i.imgur.com/27enzJB.png)
