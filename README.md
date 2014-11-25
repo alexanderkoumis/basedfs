@@ -14,7 +14,7 @@
  ```
 
 
-This might take a few minutes as it updates the machine. While this is running, create a (Github)[https://github.com] account, and follow (this guide) to create ssh keys on your machine. Once you've made an account, (email me)[alexander.koumis@sjsu.edu] your username and I will add you as a collaborator to the repository/project.
+This might take a few minutes as it updates the machine. While this is running, create a [Github](https://github.com GitHub) account, and follow [this guide](https://help.github.com/articles/generating-ssh-keys/ generate ssh keys) to create ssh keys on your machine. Once you've made an account, [email me](alexander.koumis@sjsu.edu) your username and I will add you as a collaborator to the repository/project.
 
 Once this is done, install git, which we will use to keep our code in sync:
 
