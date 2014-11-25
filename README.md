@@ -21,3 +21,11 @@ Once this is done, install git, which we will use to keep our code in sync:
 ```bash
 sudo apt-get install git
 ```
+
+Make a new directory on your Ubuntu machine to store your project:
+
+```bash
+mkdir ~/git
+cd ~/git
+git clone git@github.com:alexanderkoumis/cmpe142fs.git
+```
