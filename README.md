@@ -83,4 +83,26 @@ If you have added a .c file to your branch, open up the `makefile` file in the p
 
 # Mounting basedfs
 
-As I have yet to perform the mount process, I'm not 100% sure about the specific process we will follow, in the meantime refer to the [mount](http://linux.die.net/man/8/mount mount) manual. This section will soon be updated.
+First you will need to create an image file and mount point. Go to a directory of your choice:
+```bash
+dd bs=4096 count=100 if=/dev/zero of=image
+mkdir /mount
+```
+Now to mount we need to insert the kernel module:
+
+```bash
+sudo insmod basedfs.ko
+sudo mount -o loop -t basedfs image ./mount
+```
+
+To check to make sure fs is mounted:
+```bash
+sudo cat /etc/mtab
+```
+
+look at the last line and check for our fs.
+
+To unmount:
+```bash
+sudo umount ./mount
+```
