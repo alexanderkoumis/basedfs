@@ -105,4 +105,8 @@ look at the last line and check for our fs.
 To unmount:
 ```bash
 sudo umount ./mount
+<<<<<<< HEAD
 ```
+=======
+```
+>>>>>>> master
