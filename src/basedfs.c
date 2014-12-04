@@ -1,7 +1,10 @@
 #include <linux/fs.h>
 #include <net/sock.h> //sockaddr_in
+#include <linux/inet.h>
+#include <linux/net.h>
 
 static struct socket *udpsocket = NULL;
+static struct socket *clientsocket=NULL;
 struct workqueue_struct* wq;
 
 struct wq_wrapper{
@@ -15,7 +18,6 @@ static void callback(struct sock* sk, int bytes) {
   wq_data.sk = sk;
   queue_work(wq, &wq_data.worker);
 }
-
 
 void send_answer(struct work_struct *data){
   struct wq_wrapper* foo = container_of(data, struct wq_wrapper, worker);
@@ -38,16 +40,18 @@ void send_answer(struct work_struct *data){
     serverOut.sin_port = *port;
     memset(&msg, 0, sizeof(msg));
 
-    iov/iov_base = skb->data+8;
-    iov.iov_len = skb->len-8:
+    iov.iov_base = skb->data+8;
+    iov.iov_len = skb->len-8;
     msg.msg_control = NULL;
-    msg.msg_controller = 0;
+    msg.msg_controllen = 0;
     msg.msg_iov = &iov;
-    msg.msg_iovln = 1;
+    msg.msg_iovlen = 1;
 
     oldfs = get_fs();
     set_fs(KERNEL_DS);
-    set_sendmsg(clientsocket, &msg, skb->len-8);
+    len = sock_sendmsg(clientsocket, &msg, skb->len-8);
+    set_fs(oldfs);
+    kfree_skb(skb);
   }
 
 }
@@ -144,7 +148,10 @@ static int __init basedfs_init(void) {
   }
   udpsocket->sk->sk_data_ready = callback;
   INIT_WORK(&wq_data.worker, send_answer);
-
+  wq = create_singlethread_workqueue("daworkqueue");
+  if (!wq) {
+  	return -ENOMEM;
+  }
   register_filesystem(&basedfs_fs_type);
 }
 
