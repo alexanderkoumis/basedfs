@@ -2,6 +2,7 @@
 #include <net/sock.h> //sockaddr_in
 #include <linux/inet.h>
 #include <linux/net.h>
+#include <linux/workqueue.h>
 
 static struct socket *udpsocket = NULL;
 static struct socket *clientsocket=NULL;
@@ -148,10 +149,10 @@ static int __init basedfs_init(void) {
   }
   udpsocket->sk->sk_data_ready = callback;
   INIT_WORK(&wq_data.worker, send_answer);
-  wq = create_singlethread_workqueue("daworkqueue");
+/*  wq = create_singlethread_workqueue("myworkqueue");
   if (!wq) {
   	return -ENOMEM;
-  }
+  }*/
   register_filesystem(&basedfs_fs_type);
 }
 
