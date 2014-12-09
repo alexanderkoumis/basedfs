@@ -1,38 +1,74 @@
-// Guide: https://www.cs.rutgers.edu/~pxk/417/notes/sockets/udp.html
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h> // socketaddr_in
-#include <stdio.h> // fprintf()
-#include <string.h> // memcpy()
-#include <errno.h>
+#include <stdio.h> // printf(), perror()
+#include <arpa/inet.h> // sockaddr_in, socket()
+#include <string.h>
 
+const static int bufferSize = 4096;
 
 int main(int argc, char** argv) {
-  struct hostent* hp;
-  int fd;
-  printf("fuck u bitch");
-  perror("fuck u bitch2");
-  fprintf(stderr, "fuck!");
-  struct sockaddr_in serverIn;
-  char* host = "127.0.0.1";
-  char* msg = "test msg";
-  perror("fuck you!");
-  memset((char*)&serverIn, 0, sizeof(serverIn));
-  serverIn.sin_family = AF_INET;
-  serverIn.sin_port = htons(1337);
-  hp = gethostbyname(host);
-  perror("fuck nigga!!");
-  if (!hp) {
-    fprintf(stderr, "whoops shit %s\n", host);
+
+  int sock = 0;
+  int rec = 0;
+  int recLen = 0;
+  int sendLen = 0;
+
+  struct sockaddr_in recSocket;
+  struct sockaddr_in sendSocket;
+
+  char oBuffer[bufferSize];
+  char iBuffer[bufferSize];
+
+  // Create UDP socket
+  if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+    perror("What the fuck!!!! Error!");
+    return -1;
+  }
+
+  // User process address
+  memset(&recSocket, 0, sizeof(recSocket));
+  recSocket.sin_family = AF_INET;
+  recSocket.sin_addr.s_addr = inet_addr("127.0.0.1");
+  recSocket.sin_port = htons(5003);
+
+  recLen = sizeof(recSocket);
+  if (bind(sock, (struct sockaddr *) &recSocket, recLen) < 0) {
+    perror("Damn!!! bind fucked up!!");
+    return -1;
+  }
+
+  // Kernel process address
+  memset(&sendSocket, 0, sizeof(sendSocket));
+  sendSocket.sin_family = AF_INET;
+  sendSocket.sin_addr.s_addr = inet_addr("127.0.0.1");
+  sendSocket.sin_port = htons(5002);
+
+  char msg[] = "fuck u!!!!";
+  memcpy(oBuffer, msg, strlen(msg) + 1);
+  sendLen = strlen(oBuffer) + 1;
+
+  if (sendto(sock, oBuffer, sendLen, 0, (struct sockaddr*) &sendSocket,
+    sizeof(sendSocket)) != sendLen) {
+    perror("OHHHHHH SHIT!!!!!!!! sendto(sock,buf...)");
+    return -1;
+  };
+
+  printf("oBuffer: %s\niBuffer: %s\n", oBuffer, iBuffer);
+
+  memset(iBuffer, 0, bufferSize);
+  printf("sock: %i\n", sock);
+  if ((rec = recvfrom(sock, iBuffer, bufferSize, 0, NULL, NULL)) < 0) {
+    perror("SOMETHINGS MESSED UP IN RECVDDDDD");
+    return -1;
+  }
+
+  while (1) {
+    printf("oBuffer: %s\niBuffer:\n", oBuffer, iBuffer);
+    printf("ok now we wait for the package from server\n");
+    iBufferf ((rec = recvfrom(sock, iBuffer, bufferSize, 0, NULL, NULL)) < 0) {
+      perror("SOMETHINGS MESSED UP IN RECVDDDDD");
+      return -1;
+    }
+    printf("oBuffer: %s\niBuffer: %s\n", oBuffer, iBuffer);
     return 0;
   }
-  memcpy((void*)&serverIn.sin_addr, hp->h_addr_list[0], hp->h_length);
-  if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-                perror("cannot create socket\n");
-                return 0;
-        }
-  if (sendto(fd, msg, strlen(msg), 0, (struct sockaddr*)&serverIn, sizeof(serverIn)) < 0) {
-    perror("sendto fuck!");
-  }
-  return 0;
+  
 }
