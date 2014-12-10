@@ -95,7 +95,7 @@ static int basedfs_create(struct inode* dir, struct dentry* dent,
   kernelDebug("BASEDFS_CREATE\n");
 
   struct msghdr msg;
-  struct iovec iov;
+  struct iovec iov[2];
   mm_segment_t oldfs;
   struct sockaddr_in serverOut;
 
@@ -107,12 +107,13 @@ static int basedfs_create(struct inode* dir, struct dentry* dent,
   serverOut.sin_addr.s_addr = in_aton("127.0.0.1");
   serverOut.sin_port = htons(5003);
 
-  char* tmp = &dent->d_iname;
-  //memcpy (sendStr, 0x00, 1);
-  memcpy (sendStr, tmp, strlen(tmp) + 1);
+  iov[0].iov_base = "touch\n";
+  iov[0].iov_len = strlen("touch\n");
 
-  iov.iov_base = sendStr;
-  iov.iov_len = 512;
+  char* tmp = &dent->d_iname;
+  memcpy (sendStr, tmp, strlen(tmp) + 1);
+  iov[1].iov_base = sendStr;
+  iov[1].iov_len = 512;
 
   printk(KERN_DEBUG "The value in sendStr: %s, it is %d bytes long\n\n",
     sendStr, sizeof(sendStr));
@@ -122,7 +123,7 @@ static int basedfs_create(struct inode* dir, struct dentry* dent,
   msg.msg_namelen = sizeof(sendStr);
   msg.msg_control = NULL;
   msg.msg_controllen = 0;
-  msg.msg_iov = &iov;
+  msg.msg_iov = &iov[0];
   msg.msg_iovlen = sizeof(iov);
 
   oldfs = get_fs();
