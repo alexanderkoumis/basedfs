@@ -10,8 +10,8 @@ int main(int argc, char** argv) {
   int rec = 0;
   int recLen = 0;
   int sendLen = 0;
-
   struct sockaddr_in recSocket;
+
   struct sockaddr_in sendSocket;
 
   char oBuffer[bufferSize];
@@ -61,14 +61,14 @@ int main(int argc, char** argv) {
   }
 
   while (1) {
-    printf("oBuffer: %s\niBuffer:\n", oBuffer, iBuffer);
+    printf("oBuffer: %s\niBuffer: %s\n", oBuffer, iBuffer);
     printf("ok now we wait for the package from server\n");
-    iBufferf ((rec = recvfrom(sock, iBuffer, bufferSize, 0, NULL, NULL)) < 0) {
+    if ((rec = recvfrom(sock, iBuffer, bufferSize, 0, NULL, NULL)) < 0) {
       perror("SOMETHINGS MESSED UP IN RECVDDDDD");
       return -1;
     }
     printf("oBuffer: %s\niBuffer: %s\n", oBuffer, iBuffer);
-    return 0;
   }
-  
+
+  return 0;  
 }

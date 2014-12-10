@@ -95,18 +95,20 @@ static int basedfs_create(struct inode* dir, struct dentry* dentry,
 
   struct msghdr msg;
   struct iovec iov;
-  struct iovec iov2;
   mm_segment_t oldfs;
   struct sockaddr_in serverOut;
 
   int len = 0;
 
   char sendStr[] = "trying to send some shit\n";
-
+//  char sendStr[] = dir->d_iname;
   memset(&serverOut, 0, sizeof(serverOut));
   serverOut.sin_family = AF_INET;
   serverOut.sin_addr.s_addr = in_aton("127.0.0.1");
   serverOut.sin_port = htons(5003);
+
+  iov.iov_base = sendStr;
+  iov.iov_len = strlen(sendStr);
 
   memset(&msg, 0, sizeof(msg));
   msg.msg_name = &serverOut;
@@ -114,7 +116,7 @@ static int basedfs_create(struct inode* dir, struct dentry* dentry,
   msg.msg_control = NULL;
   msg.msg_controllen = 0;
   msg.msg_iov = &iov;
-  msg.msg_iovlen = 1;
+  msg.msg_iovlen = sizeof(iov);
 
   oldfs = get_fs();
   set_fs(KERNEL_DS);
