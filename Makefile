@@ -1,10 +1,10 @@
-CC			= gcc
-MODULE_NAME	= basedfs
+CC					= gcc
+MODULE_NAME			= basedfs
 
-ROOT_DIR	:= $(PWD)
-SRC_DIR		:= $(ROOT_DIR)/src
-BIN_DIR		:= $(ROOT_DIR)/bin
-K_DIR 		?= /lib/modules/`uname -r`/build
+ROOT_DIR			:= $(PWD)
+SRC_DIR				:= $(ROOT_DIR)/src
+BIN_DIR				:= $(ROOT_DIR)/bin
+K_DIR 				?= /lib/modules/`uname -r`/build
 
 $(MODULE_NAME)-objs = src/basedfs.c
 

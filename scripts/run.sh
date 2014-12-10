@@ -1,5 +1,8 @@
 #!/bin/bash
 ROOT=`pwd`
+if [ ! -f ~/mount ]; then
+    mkdir ~/mount
+fi
 if [ ! -f $ROOT/src/image ]; then
     dd bs=8M count=16 if=/dev/zero of=$ROOT/src/image
 fi

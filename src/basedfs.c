@@ -9,6 +9,7 @@
 static struct socket* serverSocket = NULL;
 static struct socket* clientSocket = NULL;
 
+
 struct workqueue_struct* wq;
 
 struct wq_wrapper {
@@ -89,7 +90,7 @@ static ssize_t basedfs_write(struct file* filp, char __user* buf, size_t len, lo
   return 0;
 }
 
-static int basedfs_create(struct inode* dir, struct dentry* dentry,
+static int basedfs_create(struct inode* dir, struct dentry* dent,
   unsigned short mode) {
   kernelDebug("BASEDFS_CREATE\n");
 
@@ -99,16 +100,22 @@ static int basedfs_create(struct inode* dir, struct dentry* dentry,
   struct sockaddr_in serverOut;
 
   int len = 0;
+  char sendStr[512] = "";
 
-  char sendStr[] = "trying to send some shit\n";
-//  char sendStr[] = dir->d_iname;
   memset(&serverOut, 0, sizeof(serverOut));
   serverOut.sin_family = AF_INET;
   serverOut.sin_addr.s_addr = in_aton("127.0.0.1");
   serverOut.sin_port = htons(5003);
 
+  char* tmp = &dent->d_iname;
+  //memcpy (sendStr, 0x00, 1);
+  memcpy (sendStr, tmp, strlen(tmp) + 1);
+
   iov.iov_base = sendStr;
-  iov.iov_len = strlen(sendStr);
+  iov.iov_len = 512;
+
+  printk(KERN_DEBUG "The value in sendStr: %s, it is %d bytes long\n\n",
+    sendStr, sizeof(sendStr));
 
   memset(&msg, 0, sizeof(msg));
   msg.msg_name = &serverOut;
@@ -124,9 +131,6 @@ static int basedfs_create(struct inode* dir, struct dentry* dentry,
   set_fs(oldfs);
 
   printk(KERN_DEBUG "iov sent some info on 5002, len: %d\n", len);
-
-  iov.iov_base = sendStr;
-  iov.iov_len = sizeof(sendStr);
 
   return 0;
 }
