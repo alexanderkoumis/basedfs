@@ -4,6 +4,7 @@
 #include <linux/inet.h>
 #include <linux/net.h>
 #include <linux/workqueue.h>
+#include <linux/buffer_head.h>
 #include <asm/current.h> // current process information
 
 static struct socket* serverSocket = NULL;
@@ -16,6 +17,14 @@ struct wq_wrapper {
   struct work_struct worker;
   struct sock* sk;
 } wq_data;
+
+
+struct basedfs_inode {
+  mode_t mode;
+  uint32_t inode_no;
+  uint32_t data_blocks;
+  uint32_t ctime;
+};
 
 static int basedfs_mknod(struct inode* dir, struct dentry* dentry,
   unsigned short mode, dev_t dev);
@@ -75,47 +84,38 @@ void send_answer(struct work_struct* data) {
   }
 }
 
+
 static inline struct basedfs_inode* BASEDFS_INODE(struct inode* inode) {
   kernelDebug("BASEDFS_INODE\n");
   return inode->i_private;
 }
 
-static ssize_t basedfs_read(struct file* filp, char* buf, size_t count, loff_t* offset) {
-  kernelDebug("BASEDFS_READ\n");
-  return 0;
-}
-
-static ssize_t basedfs_write(struct file* filp, char __user* buf, size_t len, loff_t* offset) {
-  kernelDebug("BASEDFS_WRITE\n");
-  return 0;
-}
-
-static int basedfs_create(struct inode* dir, struct dentry* dent,
-  unsigned short mode) {
-  kernelDebug("BASEDFS_CREATE\n");
+static int basedfs_open(struct inode* dir, struct file* filp) {
+  kernelDebug("BASEDFS_OPEN\n");
 
   struct msghdr msg;
   struct iovec iov[2];
   mm_segment_t oldfs;
   struct sockaddr_in serverOut;
 
-  int len = 0;
-  char sendStr[512] = "";
+  int length = 0;
 
+  char sendStr[512] = "";
+ 
   memset(&serverOut, 0, sizeof(serverOut));
   serverOut.sin_family = AF_INET;
   serverOut.sin_addr.s_addr = in_aton("127.0.0.1");
   serverOut.sin_port = htons(5003);
 
-  iov[0].iov_base = "touch\n";
-  iov[0].iov_len = strlen("touch\n");
+  iov[0].iov_base = "open\n";
+  iov[0].iov_len = strlen("open\n");
+  filp->private_data = (void*)dir->i_ino;
 
-  char* tmp = &dent->d_iname;
-  memcpy (sendStr, tmp, strlen(tmp) + 1);
+  sprintf(sendStr, "%lx", dir->i_ino);
   iov[1].iov_base = sendStr;
   iov[1].iov_len = 512;
 
-  printk(KERN_DEBUG "The value in sendStr: %s, it is %d bytes long\n\n",
+  printk(KERN_DEBUG "The value in sendStr: %s, it is %d bytes long\n",
     sendStr, sizeof(sendStr));
 
   memset(&msg, 0, sizeof(msg));
@@ -128,18 +128,117 @@ static int basedfs_create(struct inode* dir, struct dentry* dent,
 
   oldfs = get_fs();
   set_fs(KERNEL_DS);
-  len = sock_sendmsg(clientSocket, &msg, sizeof(msg));
+  length = sock_sendmsg(clientSocket, &msg, sizeof(msg));
   set_fs(oldfs);
-
-  printk(KERN_DEBUG "iov sent some info on 5002, len: %d\n", len);
 
   return 0;
 }
 
-static int basedfs_mkdir(struct inode* dir, struct dentry* dentry,
+static ssize_t basedfs_read(struct file * filp, char __user * buf, size_t len, loff_t * ppos) {
+  kernelDebug("BASEDFS_READ\n");
+  unsigned long fileID;
+
+  struct msghdr msg;
+  struct iovec iov[2];
+  mm_segment_t oldfs;
+  struct sockaddr_in serverOut;
+
+  int length = 0;
+
+  char sendStr[512] = "";
+ 
+  memset(&serverOut, 0, sizeof(serverOut));
+  serverOut.sin_family = AF_INET;
+  serverOut.sin_addr.s_addr = in_aton("127.0.0.1");
+  serverOut.sin_port = htons(5003);
+
+  iov[0].iov_base = "read\n";
+  iov[0].iov_len = strlen("read\n");
+  fileID = (unsigned long) filp->private_data;
+  printk(KERN_DEBUG "The value in fileID: %lx\n", fileID);
+
+  sprintf(sendStr, "%lx", fileID);
+  iov[1].iov_base = sendStr;
+  iov[1].iov_len = 512;
+
+  memset(&msg, 0, sizeof(msg));
+  msg.msg_name = &serverOut;
+  msg.msg_namelen = sizeof(sendStr);
+  msg.msg_control = NULL;
+  msg.msg_controllen = 0;
+  msg.msg_iov = &iov[0];
+  msg.msg_iovlen = sizeof(iov);
+
+  oldfs = get_fs();
+  set_fs(KERNEL_DS);
+  length = sock_sendmsg(clientSocket, &msg, sizeof(msg));
+  set_fs(oldfs);
+
+
+}
+
+static ssize_t basedfs_write(struct file* filp, char __user* buf, size_t len, loff_t* offset) {
+  kernelDebug("BASEDFS_WRITE\n");
+
+
+  unsigned long fileID;
+  struct msghdr msg;
+  struct iovec iov[2];
+  mm_segment_t oldfs;
+  struct sockaddr_in serverOut;
+
+  int length = 0;
+  char fileStr[512] = "";
+  char dataStr[512] = "";
+ 
+  memset(&serverOut, 0, sizeof(serverOut));
+  serverOut.sin_family = AF_INET;
+  serverOut.sin_addr.s_addr = in_aton("127.0.0.1");
+  serverOut.sin_port = htons(5003);
+
+  fileID = (unsigned long) filp->private_data;
+
+  iov[0].iov_base = "write\n";
+  iov[0].iov_len = strlen("write\n");
+
+  sprintf(fileStr, "%lx", fileID);
+  iov[1].iov_base = fileStr;
+  iov[1].iov_len = 512;
+
+  if (copy_from_user(dataStr, buf, len)) {
+    printk(KERN_ERR "FUCK!\n");
+    return -EFAULT;
+  }
+
+  iov[2].iov_base = dataStr;
+  iov[2].iov_len = 512;
+
+  memset(&msg, 0, sizeof(msg));
+  msg.msg_name = &serverOut;
+  msg.msg_namelen = sizeof(fileStr) + sizeof (dataStr);
+  msg.msg_control = NULL;
+  msg.msg_controllen = 0;
+  msg.msg_iov = &iov[0];
+  msg.msg_iovlen = sizeof(iov);
+
+  oldfs = get_fs();
+  set_fs(KERNEL_DS);
+  length = sock_sendmsg(clientSocket, &msg, sizeof(msg));
+  set_fs(oldfs);
+
+  return 0;
+}
+
+static int basedfs_create(struct inode* dir, struct dentry* dent,
+  unsigned short mode) {
+  kernelDebug("BASEDFS_CREATE\n");
+  return basedfs_mknod(dir, dent, mode | S_IFREG, 0);
+}
+
+static int basedfs_mkdir(struct inode* dir, struct dentry* dent,
   unsigned short mode) {
   kernelDebug("BASEDFS_MKDIR\n");
-  d_add(dentry, dir);
+  d_add(dent, dir);
   return 0;
 }
 
@@ -147,19 +246,21 @@ static int basedfs_mknod(struct inode* dir, struct dentry* dentry,
   unsigned short mode, dev_t dev) {
   kernelDebug("BASEDFS_MKNOD\n");
   struct inode* ret = basedfs_make_inode(dir->i_sb, dir, mode, dev);
-  int error = -1;
+  int err = -ENOSPC;
   if (ret) {
     d_instantiate(dentry, ret);
     dget(dentry);
-    error = 0;
+    err = 0;
     dir->i_mtime = dir->i_ctime = CURRENT_TIME;
   }
-  return error;
+  return err;
 }
 
 const struct file_operations basedfs_file_operations = {
+  .open = basedfs_open,
   .read = basedfs_read,
   .write = basedfs_write,
+  .fsync = noop_fsync,
 };
 
 const struct inode_operations basedfs_file_inode_operations = {
