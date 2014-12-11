@@ -1,15 +1,11 @@
 #include <linux/fs.h>
-#include <linux/string.h>
 #include <linux/module.h>
+#include <net/sock.h> //sockaddr_in
 #include <linux/inet.h>
 #include <linux/net.h>
 #include <linux/workqueue.h>
 #include <linux/buffer_head.h>
-#include <linux/mutex.h>
 #include <asm/current.h> // current process information
-#include <net/sock.h> //sockaddr_in
-
-#define bufferSize 4096
 
 static struct socket* serverSocket = NULL;
 static struct socket* clientSocket = NULL;
@@ -22,16 +18,18 @@ struct wq_wrapper {
 } wq_data;
 
 struct usrMsg {
-	char* op;
-	char* fid;
-	char* pay;
+  char op[128];
+  char fid[128];
+  char pay[1024];
 };
 
-struct mutex lock;
+int readBusy;
 
-int readBusy = 0;
 
-static char readBuffer[bufferSize];
+static int basedfs_mknod(struct inode* dir, struct dentry* dentry,
+  unsigned short mode, dev_t dev);
+struct inode* basedfs_make_inode(struct super_block* sb,
+  const struct inode* dir, umode_t mode, dev_t dev);
 
 
 void kernelDebug(const char* message) {
@@ -46,7 +44,8 @@ void openResponse(struct usrMsg* msg) {
 
 void readResponse(struct usrMsg* msg) {
   kernelDebug("READ_RESPONSE\n");
-  memcpy(readBuffer, msg->pay, bufferSize);
+  printk(KERN_DEBUG "(in kernel) payload: %s\n", msg->pay);
+  //memcpy(readBuffer, msg->pay, bufferSize);
   readBusy = 0;
 }
 
@@ -72,8 +71,10 @@ void kernelToUser(struct usrMsg* msg) {
 
 }
 
-void consumeDaemonPkg(char* daemonResponse, struct usrMsg* msg) {
+void consumeDaemonPkg(char* daemonResponse, struct usrMsg** userMsg) {
   kernelDebug("CONSUME_DAEMON_PKG\n");
+  struct usrMsg* msg = *userMsg;
+  userMsg = (struct usrMsg*)kmalloc(sizeof(struct usrMsg), __GFP_WAIT | __GFP_IO | __GFP_FS);
 
   char* token = NULL;
   char* delim = "\n";
@@ -84,27 +85,24 @@ void consumeDaemonPkg(char* daemonResponse, struct usrMsg* msg) {
     printk("Token received: %s\n", token);
     switch (count++) {
       case 0:
-        msg->op = token;
+        sprintf(msg->op, "%s", token);
+       // msg->op = token
       break;
       case 1:
-        msg->fid = token;
+        sprintf(msg->fid, "%s", token);
+       // msg->fid = token;
       break;
       case 2:
-        msg->pay = token;
+        sprintf(msg->pay, "%s", token);
+       // msg->pay = token;
       break;
       default:
         printk("you fucked up!\n");
       break;
     }
   }
+  return msg;
 }
-
-
-static int basedfs_mknod(struct inode* dir, struct dentry* dentry,
-  unsigned short mode, dev_t dev);
-struct inode* basedfs_make_inode(struct super_block* sb,
-  const struct inode* dir, umode_t mode, dev_t dev);
-
 
 static void callback(struct sock* sk, int bytes) {
   kernelDebug("CALLBACK\n");
@@ -119,14 +117,19 @@ void send_answer(struct work_struct* data) {
 
   while((len = skb_queue_len(&foo->sk->sk_receive_queue)) > 0) {
     struct sk_buff* skb = NULL;
+
+    mm_segment_t oldfs;
+
     skb = skb_dequeue(&foo->sk->sk_receive_queue);
     printk(KERN_DEBUG "Message length: %d\nMessage: %s\n", skb->len-8, skb->data+8);
+
     struct usrMsg* msg;
-    consumeDaemonPkg(skb->data+8, msg);
+    consumeDaemonPkg(skb->data+8, &msg);
     kernelToUser(msg);
+    printk(KERN_DEBUG "Is this a token? -> %s\n", msg->op);
+
   }
 }
-
 
 static inline struct basedfs_inode* BASEDFS_INODE(struct inode* inode) {
   kernelDebug("BASEDFS_INODE\n");
@@ -177,16 +180,9 @@ static int basedfs_open(struct inode* dir, struct file* filp) {
   return 0;
 }
 
-static ssize_t basedfs_read(struct file* filp, char __user* buf, size_t len, loff_t* offset) {
+static ssize_t basedfs_read(struct file * filp, char __user * buf, size_t len, loff_t * ppos) {
   kernelDebug("BASEDFS_READ\n");
-
   unsigned long fileID;
-
-
-  mutex_lock(&lock);
-  readBusy = 1;
-
-  memset(&readBuffer[0], 0, sizeof(readBuffer));
 
   struct msghdr msg;
   struct iovec iov;
@@ -194,7 +190,6 @@ static ssize_t basedfs_read(struct file* filp, char __user* buf, size_t len, lof
   struct sockaddr_in serverOut;
 
   int length = 0;
-  int busyCount = 0;
 
   char sendStr[512] = "";
  
@@ -223,15 +218,6 @@ static ssize_t basedfs_read(struct file* filp, char __user* buf, size_t len, lof
   length = sock_sendmsg(clientSocket, &msg, sizeof(msg));
   set_fs(oldfs);
 
-  while (readBusy) {
-    printk(KERN_DEBUG "read is busy... (%d)\n", busyCount++);
-  }
-  copy_to_user(buf, readBuffer, bufferSize);
-  *offset += len;
-
-  mutex_unlock(&lock);
-
-  return len;
 }
 
 static ssize_t basedfs_write(struct file* filp, char __user* buf, size_t len, loff_t* offset) {
