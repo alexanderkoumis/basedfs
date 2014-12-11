@@ -1,11 +1,15 @@
 #include <linux/fs.h>
+#include <linux/string.h>
 #include <linux/module.h>
-#include <net/sock.h> //sockaddr_in
 #include <linux/inet.h>
 #include <linux/net.h>
 #include <linux/workqueue.h>
 #include <linux/buffer_head.h>
+#include <linux/mutex.h>
 #include <asm/current.h> // current process information
+#include <net/sock.h> //sockaddr_in
+
+#define bufferSize 4096
 
 static struct socket* serverSocket = NULL;
 static struct socket* clientSocket = NULL;
@@ -17,21 +21,62 @@ struct wq_wrapper {
   struct sock* sk;
 } wq_data;
 
-struct basedfs_inode {
-  mode_t mode;
-  uint32_t inode_no;
-  uint32_t data_blocks;
-  uint32_t ctime;
+struct usrMsg {
+	char* op;
+	char* fid;
+	char* pay;
 };
 
-void respondToUser(char* daemonResponse) {
+struct mutex lock;
+
+int readBusy = 0;
+
+static char readBuffer[bufferSize];
+
+
+void kernelDebug(const char* message) {
+  printk(message);
+  printk("\t-> User space pid: %i\n\t-> User space process: %s\n",
+  current->pid, current->comm);
+}
+
+void openResponse(struct usrMsg* msg) {
+  kernelDebug("OPEN_RESPONSE\n");
+}
+
+void readResponse(struct usrMsg* msg) {
+  kernelDebug("READ_RESPONSE\n");
+  memcpy(readBuffer, msg->pay, bufferSize);
+  readBusy = 0;
+}
+
+void writeResponse(struct usrMsg* msg) {
+  kernelDebug("WRITE_RESPONSE\n");
+}
+
+void kernelToUser(struct usrMsg* msg) {
+  kernelDebug("KERNEL_TO_USER\n");
+
+  if (strstr(msg->op, "open")) {
+    openResponse(msg);
+  }
+  else if (strstr(msg->op, "read")) {
+    readResponse(msg);
+  }
+  else if (strstr(msg->op, "write")) {
+    writeResponse(msg);
+  }
+  else {
+    printk(KERN_ERR "Not sure why msg->op is \"%s\"...\n", msg->op);
+  }
+
+}
+
+void consumeDaemonPkg(char* daemonResponse, struct usrMsg* msg) {
+  kernelDebug("CONSUME_DAEMON_PKG\n");
 
   char* token = NULL;
   char* delim = "\n";
-
-  char* op = NULL;
-  char* fid = NULL;
-  char* payload = NULL;
 
   int count = 0;
 
@@ -39,13 +84,13 @@ void respondToUser(char* daemonResponse) {
     printk("Token received: %s\n", token);
     switch (count++) {
       case 0:
-        op = token;
+        msg->op = token;
       break;
       case 1:
-        fid = token;
+        msg->fid = token;
       break;
       case 2:
-        payload = token;
+        msg->pay = token;
       break;
       default:
         printk("you fucked up!\n");
@@ -54,16 +99,12 @@ void respondToUser(char* daemonResponse) {
   }
 }
 
+
 static int basedfs_mknod(struct inode* dir, struct dentry* dentry,
   unsigned short mode, dev_t dev);
 struct inode* basedfs_make_inode(struct super_block* sb,
   const struct inode* dir, umode_t mode, dev_t dev);
 
-void kernelDebug(const char* message) {
-  printk(message);
-  printk("\t-> User space pid: %i\n\t-> User space process: %s\n",
-  current->pid, current->comm);
-}
 
 static void callback(struct sock* sk, int bytes) {
   kernelDebug("CALLBACK\n");
@@ -78,34 +119,11 @@ void send_answer(struct work_struct* data) {
 
   while((len = skb_queue_len(&foo->sk->sk_receive_queue)) > 0) {
     struct sk_buff* skb = NULL;
-    unsigned short* port;
-    struct msghdr msg;
-    struct iovec iov;
-    mm_segment_t oldfs;
-    struct sockaddr_in serverOut;
-
     skb = skb_dequeue(&foo->sk->sk_receive_queue);
     printk(KERN_DEBUG "Message length: %d\nMessage: %s\n", skb->len-8, skb->data+8);
-    memset(&serverOut, 0, sizeof(serverOut));
-    respondToUser(skb->data+8);
-   
-   /* 
-    iov.iov_base = skb->data+8;
-    iov.iov_len = skb->len-8;
- 
-    memset(&msg, 0, sizeof(msg));
-    msg.msg_name = &serverOut;
-    msg.msg_namelen = sizeof(serverOut);
-    msg.msg_control = NULL;
-    msg.msg_controllen = 0;
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
-    
-    oldfs = get_fs();
-    set_fs(KERNEL_DS); 
-    len = sock_sendmsg(clientSocket, &msg, skb->len-8);
-    set_fs(oldfs);
-    kfree_skb(skb);*/
+    struct usrMsg* msg;
+    consumeDaemonPkg(skb->data+8, msg);
+    kernelToUser(msg);
   }
 }
 
@@ -159,9 +177,16 @@ static int basedfs_open(struct inode* dir, struct file* filp) {
   return 0;
 }
 
-static ssize_t basedfs_read(struct file * filp, char __user * buf, size_t len, loff_t * ppos) {
+static ssize_t basedfs_read(struct file* filp, char __user* buf, size_t len, loff_t* offset) {
   kernelDebug("BASEDFS_READ\n");
+
   unsigned long fileID;
+
+
+  mutex_lock(&lock);
+  readBusy = 1;
+
+  memset(&readBuffer[0], 0, sizeof(readBuffer));
 
   struct msghdr msg;
   struct iovec iov;
@@ -169,6 +194,7 @@ static ssize_t basedfs_read(struct file * filp, char __user * buf, size_t len, l
   struct sockaddr_in serverOut;
 
   int length = 0;
+  int busyCount = 0;
 
   char sendStr[512] = "";
  
@@ -197,7 +223,15 @@ static ssize_t basedfs_read(struct file * filp, char __user * buf, size_t len, l
   length = sock_sendmsg(clientSocket, &msg, sizeof(msg));
   set_fs(oldfs);
 
+  while (readBusy) {
+    printk(KERN_DEBUG "read is busy... (%d)\n", busyCount++);
+  }
+  copy_to_user(buf, readBuffer, bufferSize);
+  *offset += len;
 
+  mutex_unlock(&lock);
+
+  return len;
 }
 
 static ssize_t basedfs_write(struct file* filp, char __user* buf, size_t len, loff_t* offset) {
