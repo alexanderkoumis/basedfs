@@ -2,16 +2,17 @@
 #include <arpa/inet.h> // sockaddr_in, socket()
 #include <string.h>
 
-
 const static int bufferSize = 4096;
+const static int serverPort = 5002;
+const static int clientPort = 5003;
 
 void createDummyFile() {
-	FILE* dummyFile;
-	char* dummyText = "This is some text";
-	dummyFile = fopen("/home/ubuntu/fs/dummy", "w");
-	fprintf(dummyFile, "%s", dummyText);
-	printf("Just printed \"%s\" to the dummy file.\n", dummyText);
-	fclose(dummyFile);
+  FILE* dummyFile;
+  char* dummyText = "This is some text";
+  dummyFile = fopen("/home/ubuntu/fs/dummy", "w");
+  fprintf(dummyFile, "%s", dummyText);
+  printf("Just printed \"%s\" to the dummy file.\n", dummyText);
+  fclose(dummyFile);
 }
 
 int main(int argc, char** argv) {
@@ -21,9 +22,6 @@ int main(int argc, char** argv) {
   int rec = 0;
   int recLen = 0;
   int sendLen = 0;
-
-  int serverPort = 5002;
-  int clientPort = 5003;
 
   struct sockaddr_in recSocket;
   struct sockaddr_in sendSocket;
@@ -44,19 +42,17 @@ int main(int argc, char** argv) {
   memset(&recSocket, 0, sizeof(recSocket));
   recSocket.sin_family = AF_INET;
   recSocket.sin_addr.s_addr = inet_addr("127.0.0.1");
-  recSocket.sin_port = htons(clientPort);
+  recSocket.sin_port = htons(5003);
 
   recLen = sizeof(recSocket);
   if (bind(sock, (struct sockaddr *) &recSocket, recLen) < 0) {
     perror("Damn!!! bind fucked up!!");
-    return -1;
   }
 
-  // Kernel process address
   memset(&sendSocket, 0, sizeof(sendSocket));
   sendSocket.sin_family = AF_INET;
   sendSocket.sin_addr.s_addr = inet_addr("127.0.0.1");
-  sendSocket.sin_port = htons(serverPort);
+  sendSocket.sin_port = htons(5002);
 
   const char n = '\n';
 
@@ -82,13 +78,13 @@ int main(int argc, char** argv) {
 
     printf("\tOp: %s\n", op);
     printf("\tFID: %s\n", fid);
-    if (payload) {
+    if (payload != NULL) {
       printf("\tPayload: %s\n", payload);
     }
-
     memset(nameBuffer, 0, bufferSize);
     strcpy(nameBuffer, prefix);
     strcat(nameBuffer, fid);
+
 
     if (strstr(op, "open")) {
       printf("\t\tCreating file: %s\n", nameBuffer);
@@ -127,7 +123,8 @@ int main(int argc, char** argv) {
       printf("\t\tClosing file: %s\n", nameBuffer);
       fclose(infile);
 
-      sprintf(oBuffer, "%s\n%lx\n%s", op, (unsigned long)fid, "");
+      sprintf(oBuffer, "%s\n%s\n%s", op, fid, "");
+          //sprintf(oBuffer, "%s\n%s\n%s", op, fid, "");
       printf("\t\tSending \"%s\" back to kernel\n", oBuffer);
       if (sendto(sock, oBuffer, 512, 0, (struct sockaddr*) &sendSocket,
         sizeof(sendSocket)) != 512) {

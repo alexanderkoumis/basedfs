@@ -10,7 +10,6 @@
 static struct socket* serverSocket = NULL;
 static struct socket* clientSocket = NULL;
 
-
 struct workqueue_struct* wq;
 
 struct wq_wrapper {
@@ -18,13 +17,42 @@ struct wq_wrapper {
   struct sock* sk;
 } wq_data;
 
-
 struct basedfs_inode {
   mode_t mode;
   uint32_t inode_no;
   uint32_t data_blocks;
   uint32_t ctime;
 };
+
+void respondToUser(char* daemonResponse) {
+
+  char* token = NULL;
+  char* delim = "\n";
+
+  char* op = NULL;
+  char* fid = NULL;
+  char* payload = NULL;
+
+  int count = 0;
+
+  while (token = strsep(&daemonResponse, delim)) {
+    printk("Token received: %s\n", token);
+    switch (count++) {
+      case 0:
+        op = token;
+      break;
+      case 1:
+        fid = token;
+      break;
+      case 2:
+        payload = token;
+      break;
+      default:
+        printk("you fucked up!\n");
+      break;
+    }
+  }
+}
 
 static int basedfs_mknod(struct inode* dir, struct dentry* dentry,
   unsigned short mode, dev_t dev);
@@ -59,12 +87,9 @@ void send_answer(struct work_struct* data) {
     skb = skb_dequeue(&foo->sk->sk_receive_queue);
     printk(KERN_DEBUG "Message length: %d\nMessage: %s\n", skb->len-8, skb->data+8);
     memset(&serverOut, 0, sizeof(serverOut));
-    
-    port = (unsigned short*)skb->data;
-    serverOut.sin_family = AF_INET;
-    serverOut.sin_addr.s_addr = in_aton("127.0.0.1");
-    serverOut.sin_port = *port;
-    
+    respondToUser(skb->data+8);
+   
+   /* 
     iov.iov_base = skb->data+8;
     iov.iov_len = skb->len-8;
  
@@ -80,7 +105,7 @@ void send_answer(struct work_struct* data) {
     set_fs(KERNEL_DS); 
     len = sock_sendmsg(clientSocket, &msg, skb->len-8);
     set_fs(oldfs);
-    kfree_skb(skb);
+    kfree_skb(skb);*/
   }
 }
 
@@ -334,7 +359,7 @@ static int __init basedfs_init(void) {
   }
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = in_aton("127.0.0.1");
-  server.sin_port = (unsigned short*)5002;
+  server.sin_port = htons(5002);
   error = serverSocket->ops->bind(serverSocket,  // The last two arguments are used as
     (struct sockaddr*) &server, sizeof(server)); // arguments to the callback function
   if (error) {

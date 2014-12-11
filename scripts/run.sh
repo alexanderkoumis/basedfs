@@ -1,7 +1,7 @@
 #!/bin/bash
-ROOT=`pwd`
-if [ ! -f ~/mount ]; then
-    mkdir ~/mount
+ROOT=~/git/cmpe142fs
+if [ ! -f ~/mount -o ~/fs ]; then
+    mkdir ~/mount ~/fs
 fi
 if [ ! -f $ROOT/src/image ]; then
     dd bs=8M count=16 if=/dev/zero of=$ROOT/src/image
