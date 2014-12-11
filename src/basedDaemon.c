@@ -5,8 +5,18 @@
 
 const static int bufferSize = 4096;
 
+void createDummyFile() {
+	FILE* dummyFile;
+	char* dummyText = "This is some text";
+	dummyFile = fopen("/home/ubuntu/fs/dummy", "w");
+	fprintf(dummyFile, "%s", dummyText);
+	printf("Just printed \"%s\" to the dummy file.\n", dummyText);
+	fclose(dummyFile);
+}
+
 int main(int argc, char** argv) {
 
+  createDummyFile();
   int sock = 0;
   int rec = 0;
   int recLen = 0;
@@ -51,59 +61,92 @@ int main(int argc, char** argv) {
   const char n = '\n';
 
   while (1) {
-    char* op = NULL;
-    char* arg1 = NULL;
-    char* arg2 = NULL;
+
     printf("Listening for basedfs packages on port %d\n", clientPort);
+
+    char* op = NULL;
+    char* fid = NULL;
+    char* payload = NULL;
+
     memset(iBuffer, 0, bufferSize);
+    memset(oBuffer, 0, bufferSize);
+
     if ((rec = recvfrom(sock, iBuffer, bufferSize, 0, NULL, NULL)) < 0) {
       perror("SOMETHINGS MESSED UP IN RECVDDDDD");
       return -1;
     }
+
     op = strtok(iBuffer, &n);
-    arg1 = strtok(NULL, &n);
-    arg2 = strtok(NULL, &n);
+    fid = strtok(NULL, &n);
+    payload = strtok(NULL, &n);
+
     printf("\tOp: %s\n", op);
-    printf("\tArg1: %s\n", arg1);
-    if (arg2) {
-      printf("\tArg2: %s\n", arg2);
+    printf("\tFID: %s\n", fid);
+    if (payload) {
+      printf("\tPayload: %s\n", payload);
     }
+
+    memset(nameBuffer, 0, bufferSize);
+    strcpy(nameBuffer, prefix);
+    strcat(nameBuffer, fid);
+
     if (strstr(op, "open")) {
-      memset(nameBuffer, 0, bufferSize);
-      strcpy(nameBuffer, prefix);
-      strcat(nameBuffer, arg1);
       printf("\t\tCreating file: %s\n", nameBuffer);
       FILE* infile;
       infile = fopen(nameBuffer, "w");
+
       printf("\t\tClosing file: %s\n", nameBuffer);
       fclose(infile);
     }
+
     else if (strstr(op, "read")) {
-      memset(nameBuffer, 0, bufferSize);
-      strcpy(nameBuffer, prefix);
-      strcat(nameBuffer, arg1);
       printf("\t\tOpening file: %s\n", nameBuffer);
+
       FILE* infile;
-      infile = fopen(nameBuffer, "r");
+      infile = fopen(nameBuffer, "r+");
+      fread(oBuffer, sizeof(char), bufferSize, infile);
+
+      if (sendto(sock, oBuffer, sendLen, 0, (struct sockaddr*) &sendSocket,
+        sizeof(sendSocket)) != sendLen) {
+        perror("OHHHHHH SHIT!!!!!!!! sendto(sock,buf...)");
+        return -1;
+      };
+
+      printf("\t\t\tFile contents: %s\n", oBuffer);
       printf("\t\tClosing file: %s\n", nameBuffer);
       fclose(infile);
     }
+
     else if (strstr(op, "write")) {
-      memset(nameBuffer, 0, bufferSize);
-      strcpy(nameBuffer, prefix);
-      strcat(nameBuffer, arg1);
-      arg2 = strtok(NULL, &n);
       printf("\t\tOpening file: %s\n", nameBuffer);
       FILE* infile;
       infile = fopen(nameBuffer, "w");
+      fprintf(infile, "%s", payload);
+      printf("\t\t\tWrote \"%s\" to file:\n\t\t\t\t%s\n", payload, nameBuffer);
+
       printf("\t\tClosing file: %s\n", nameBuffer);
       fclose(infile);
+
+      sprintf(oBuffer, "%s\n%lx\n%s", op, (unsigned long)fid, "");
+      printf("\t\tSending \"%s\" back to kernel\n", oBuffer);
+      if (sendto(sock, oBuffer, 512, 0, (struct sockaddr*) &sendSocket,
+        sizeof(sendSocket)) != 512) {
+        perror("OHHHHHH SHIT!!!!!!!! sendto(sock,buf...)");
+        return -1;
+      };
+
     }
-    memset(iBuffer, 0, bufferSize);
   }
 
-  return 0;  
+  return 0;
 }
+
+
+  // if (sendto(sock, oBuffer, sendLen, 0, (struct sockaddr*) &sendSocket,
+  //   sizeof(sendSocket)) != sendLen) {
+  //   perror("OHHHHHH SHIT!!!!!!!! sendto(sock,buf...)");
+  //   return -1;
+  // };
 
 
 

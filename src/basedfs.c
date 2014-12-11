@@ -139,7 +139,7 @@ static ssize_t basedfs_read(struct file * filp, char __user * buf, size_t len, l
   unsigned long fileID;
 
   struct msghdr msg;
-  struct iovec iov[2];
+  struct iovec iov;
   mm_segment_t oldfs;
   struct sockaddr_in serverOut;
 
@@ -152,21 +152,19 @@ static ssize_t basedfs_read(struct file * filp, char __user * buf, size_t len, l
   serverOut.sin_addr.s_addr = in_aton("127.0.0.1");
   serverOut.sin_port = htons(5003);
 
-  iov[0].iov_base = "read\n";
-  iov[0].iov_len = strlen("read\n");
   fileID = (unsigned long) filp->private_data;
-  printk(KERN_DEBUG "The value in fileID: %lx\n", fileID);
 
-  sprintf(sendStr, "%lx", fileID);
-  iov[1].iov_base = sendStr;
-  iov[1].iov_len = 512;
+  sprintf(sendStr, "%s\n%lx", "read", fileID);
+
+  iov.iov_base = sendStr;
+  iov.iov_len = strlen(sendStr);
 
   memset(&msg, 0, sizeof(msg));
   msg.msg_name = &serverOut;
   msg.msg_namelen = sizeof(sendStr);
   msg.msg_control = NULL;
   msg.msg_controllen = 0;
-  msg.msg_iov = &iov[0];
+  msg.msg_iov = &iov;
   msg.msg_iovlen = sizeof(iov);
 
   oldfs = get_fs();
@@ -180,16 +178,19 @@ static ssize_t basedfs_read(struct file * filp, char __user * buf, size_t len, l
 static ssize_t basedfs_write(struct file* filp, char __user* buf, size_t len, loff_t* offset) {
   kernelDebug("BASEDFS_WRITE\n");
 
-
   unsigned long fileID;
   struct msghdr msg;
-  struct iovec iov[2];
+  struct iovec iov;
   mm_segment_t oldfs;
   struct sockaddr_in serverOut;
 
   int length = 0;
-  char fileStr[512] = "";
-  char dataStr[512] = "";
+  char sendStr[512];
+
+  if (copy_from_user(sendStr, buf, len)) {
+    printk(KERN_ERR "FUCK!\n");
+    return -EFAULT;
+  }
  
   memset(&serverOut, 0, sizeof(serverOut));
   serverOut.sin_family = AF_INET;
@@ -198,27 +199,18 @@ static ssize_t basedfs_write(struct file* filp, char __user* buf, size_t len, lo
 
   fileID = (unsigned long) filp->private_data;
 
-  iov[0].iov_base = "write\n";
-  iov[0].iov_len = strlen("write\n");
+  sprintf(sendStr, "%s\n%lx\n%s", "write", fileID, buf);
+  iov.iov_base = sendStr;
+  iov.iov_len = 512;
 
-  sprintf(fileStr, "%lx", fileID);
-  iov[1].iov_base = fileStr;
-  iov[1].iov_len = 512;
-
-  if (copy_from_user(dataStr, buf, len)) {
-    printk(KERN_ERR "FUCK!\n");
-    return -EFAULT;
-  }
-
-  iov[2].iov_base = dataStr;
-  iov[2].iov_len = 512;
+  printk(KERN_DEBUG "YOU TRYNA WRITE: %s\n", sendStr);
 
   memset(&msg, 0, sizeof(msg));
   msg.msg_name = &serverOut;
-  msg.msg_namelen = sizeof(fileStr) + sizeof (dataStr);
+  msg.msg_namelen = 512;
   msg.msg_control = NULL;
   msg.msg_controllen = 0;
-  msg.msg_iov = &iov[0];
+  msg.msg_iov = &iov;
   msg.msg_iovlen = sizeof(iov);
 
   oldfs = get_fs();
@@ -226,7 +218,7 @@ static ssize_t basedfs_write(struct file* filp, char __user* buf, size_t len, lo
   length = sock_sendmsg(clientSocket, &msg, sizeof(msg));
   set_fs(oldfs);
 
-  return 0;
+  return length;
 }
 
 static int basedfs_create(struct inode* dir, struct dentry* dent,
@@ -340,7 +332,6 @@ static int __init basedfs_init(void) {
         current->pid, current->comm);
     return -EIO;
   }
-  
   server.sin_family = AF_INET;
   server.sin_addr.s_addr = in_aton("127.0.0.1");
   server.sin_port = (unsigned short*)5002;
