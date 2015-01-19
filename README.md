@@ -1,5 +1,7 @@
 # basedfs
 
+*Note* This is a skeleton UDP-based VFS designed for an OS class project. It can be touched, written to (but not read), and ls'd by the kernel, but is otherwise not functional beyond the scope required by the project.
+
 ## Setup VM
 
 1. Download [Ubuntu Desktop 14.04 .iso](http://www.ubuntu.com/download/desktop "Ubuntu 14.04")
