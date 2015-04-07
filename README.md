@@ -1,6 +1,6 @@
 # basedfs
 
-*Note* This is a skeleton UDP-based VFS designed for an OS class project. It can be touched, written to (but not read), and ls'd by the kernel, but is otherwise not functional beyond the scope required by the project.
+*Note* This is a skeleton UDP-based VFS designed for an OS class project (hence mini Linux/git guide at beginning). It can be touched, written to (but not read), and ls'd by the kernel, but is otherwise not functional beyond the scope required by the project.
 
 ## Setup VM
 

@@ -25,12 +25,10 @@ struct usrMsg {
 
 int readBusy;
 
-
 static int basedfs_mknod(struct inode* dir, struct dentry* dentry,
   unsigned short mode, dev_t dev);
 struct inode* basedfs_make_inode(struct super_block* sb,
   const struct inode* dir, umode_t mode, dev_t dev);
-
 
 void kernelDebug(const char* message) {
   printk(message);
