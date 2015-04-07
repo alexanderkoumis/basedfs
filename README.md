@@ -36,10 +36,10 @@ Make a new directory for your git projects and clone into it the master reposito
 ```bash
 mkdir ~/git
 cd ~/git
-git clone git@github.com:alexanderkoumis/cmpe142fs.git
+git clone git@github.com:alexanderkoumis/basedfs.git
 ```
 
-This will copy the project's contents into ~/git/cmpe142fs.
+This will copy the project's contents into ~/git/basedfs.git
 
 Each contributor will maintain their own local working branch, which should always be based on the latest code from the master. Enter the following to create your own branch, and make it accessible from the repository's 'branches' button:
 
@@ -55,7 +55,7 @@ In the terminal, type `git branch` the branches git is currently tracking.
 
 ## Making changes to local branch
 1. Make necessary edits to code (In personal branch)
-2. Once you are satisfied with your changes, tell git to track the file you changed in your next commit (checkpoint). Type `git status` to see a list of files that have changed since your last commit, followed by `git add $NAMEOFFILE` for every file to be tracked. For example, if you changed the file `~/git/cmpe142fs/inode.c`, type `git add ~/git/cmpe142fs/inode.c`
+2. Once you are satisfied with your changes, tell git to track the file you changed in your next commit (checkpoint). Type `git status` to see a list of files that have changed since your last commit, followed by `git add $NAMEOFFILE` for every file to be tracked. For example, if you changed the file `~/git/basedfs/inode.c`, type `git add ~/git/basedfs/inode.c`
 4. Commit the changes to your personal branch using the command `git commit -a -m "Descriptive commit message"`, adding within the parentheses a short description of what is in your most recent commit
 5. Check out the master branch and pull the most recent master code, merging it with your working branch, ensuring changes made to the master after you last pulled from the master do not mess up your code:
 
